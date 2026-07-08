@@ -12,17 +12,15 @@ namespace WLEDControl
     public class WLEDController : MonoBehaviour
     {
         [SerializeField] Camera myCamera;
-        Texture2D _wledTexture;
-        NativeArray<Color32> nativeColors;
 
-        [SerializeField] int targetFrameRate = 60;
-        [SerializeField] int refreshRate = 6;
-        float _refreshTimeout;
+        [SerializeField, Tooltip("X: base application target framerate\n" +
+            "Y: refresh rate (e.g. refresh LEDs every 6th frame / 10Hz for 60fps)")] 
+        int2 targetFrameAndRefreshRate = new(60, 6);
+        float _refreshTimeoutSeconds;
 
-        [SerializeField] int wledTextureMipLevel = 0;
         [SerializeField] int2 wledTextureSize = new(16, 16);
-        Rect _wledTextureSizeReadRect;
-
+        NativeArray<Color32> _wledTextureData;
+        
         [SerializeField] string wledUrl = "<WLED IP HERE>/json/";
 
         readonly StringBuilder _stringBuilder = new();
@@ -37,56 +35,42 @@ namespace WLEDControl
 
             Init();
 
-            CustomUpdate(_refreshTimeout, destroyCancellationToken).Forget();
+            CustomUpdate(_refreshTimeoutSeconds, destroyCancellationToken).Forget();
         }
 
         void Init()
         {
-            Application.targetFrameRate = targetFrameRate;
-            _refreshTimeout = (float) refreshRate / targetFrameRate;
+            Application.targetFrameRate = targetFrameAndRefreshRate.x;
+            _refreshTimeoutSeconds = (float)targetFrameAndRefreshRate.y / targetFrameAndRefreshRate.x;
 
-            _wledTexture = new Texture2D(
-                wledTextureSize.x, wledTextureSize.y,
-                TextureFormat.RGBA32,
-                mipChain: false, linear: false);
-
-            nativeColors = new NativeArray<Color32>(wledTextureSize.x * wledTextureSize.y, Allocator.Persistent);
-
-            _wledTextureSizeReadRect = new(0, 0, wledTextureSize.x, wledTextureSize.y);
+            _wledTextureData = new NativeArray<Color32>(wledTextureSize.x * wledTextureSize.y, Allocator.Persistent);
         }
 
-        async UniTask CustomUpdate(float timeout, CancellationToken ctk)
+        async UniTaskVoid CustomUpdate(float timeout, CancellationToken ctk)
         {
             while (true)
             {
                 await UniTask.NextFrame(ctk);
-                Send();
+                await Send();
                 await UniTask.WaitForSeconds(timeout, cancellationToken: ctk);
             }
         }
 
         [ContextMenu("Send")]
-        async void Send()
+        async UniTask Send()
         {
             if (myCamera == null) return;
-            if (_wledTexture == null) Init();
+            if (!_wledTextureData.IsCreated) Init();
 
-            //RenderTexture.active = myCamera.targetTexture;
-            //_wledTexture.ReadPixels(_wledTextureSizeReadRect, 0, 0, recalculateMipMaps: false);
-            //var nativeColors = _wledTexture.GetPixelData<Color32>(wledTextureMipLevel);
-            //RenderTexture.active = null;
+            // this throws when called multiple times a frame
+            await AsyncGPUReadback.RequestIntoNativeArray(ref _wledTextureData, myCamera.targetTexture);
 
-            // TODO: this throws when called every frame
-            await AsyncGPUReadback.RequestIntoNativeArray(ref nativeColors, myCamera.targetTexture);
-
-            await SendFrameToWLED(nativeColors);
+            await SendFrameToWLED(_wledTextureData);
         }
 
         void OnDestroy()
         {
-            Destroy(_wledTexture);
-
-            if (nativeColors.IsCreated) nativeColors.Dispose();
+            if (_wledTextureData.IsCreated) _wledTextureData.Dispose();
         }
 
         async UniTask SendFrameToWLED(NativeArray<Color32> frameData)

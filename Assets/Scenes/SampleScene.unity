@@ -541,8 +541,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::WLEDControl.WLEDController
   myCamera: {fileID: 1130240985}
-  refreshRate: 6
-  wledTextureMipLevel: 0
+  targetFrameAndRefreshRate:
+    x: 60
+    y: 3
   wledTextureSize:
     x: 16
     y: 16
