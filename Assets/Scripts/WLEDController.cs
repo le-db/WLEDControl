@@ -13,7 +13,7 @@ namespace WLEDControl
     {
         [SerializeField] Camera myCamera;
 
-        [SerializeField, Tooltip("X: base application target framerate\n" +
+        [SerializeField, Tooltip("X: client application target framerate\n" +
             "Y: refresh rate (e.g. refresh LEDs every 6th frame / 10Hz for 60fps)")] 
         int2 targetFrameAndRefreshRate = new(60, 6);
         float _refreshTimeoutSeconds;
@@ -98,15 +98,24 @@ namespace WLEDControl
         {
             _stringBuilder.Clear();
 
-            _stringBuilder.Append("{\"seg\":[{\"id\":0,\"i\":[");
+            var segmentId = 0;
+            _stringBuilder.AppendFormat("{0}{1}{2}",
+                "{\"seg\":[{\"id\":",
+                segmentId,
+                ",\"i\":[");
+
             for (int i = 0; i < frameData.Length; i++)
             {
                 if (i > 0) _stringBuilder.Append(",");
                 var color = frameData[i];
 
-                string hexColor = $"{color.r:X2}{color.g:X2}{color.b:X2}";
-                _stringBuilder.Append($"{i},\"{hexColor}\"");
+                _stringBuilder.AppendFormat("{0},\"{1:X2}{2:X2}{3:X2}\"",
+                    i,
+                    color.r,
+                    color.g,
+                    color.b);
             }
+
             _stringBuilder.Append("]}]}");
 
             return Encoding.UTF8.GetBytes(_stringBuilder.ToString());
