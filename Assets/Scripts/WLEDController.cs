@@ -1,10 +1,8 @@
 using Cysharp.Threading.Tasks;
-using System.Text;
 using System.Threading;
 using Unity.Collections;
 using Unity.Mathematics;
 using UnityEngine;
-using UnityEngine.Networking;
 using UnityEngine.Rendering;
 
 namespace WLEDControl
@@ -14,16 +12,14 @@ namespace WLEDControl
         [SerializeField] Camera myCamera;
 
         [SerializeField, Tooltip("X: client application target framerate\n" +
-            "Y: refresh rate (e.g. refresh LEDs every 6th frame / 10Hz for 60fps)")] 
+            "Y: refresh rate (e.g. refresh LEDs every 6th frame / 10Hz for 60fps)")]
         int2 targetFrameAndRefreshRate = new(60, 6);
         float _refreshTimeoutSeconds;
 
         [SerializeField] int2 wledTextureSize = new(16, 16);
-        NativeArray<Color32> _wledTextureData;
+        NativeArray<Color32> wledTextureData;
         
         [SerializeField] string wledUrl = "<WLED IP HERE>/json/";
-
-        readonly StringBuilder _stringBuilder = new();
 
         void Start()
         {
@@ -31,11 +27,12 @@ namespace WLEDControl
             {
                 Debug.LogError("Camera either null or has no target render texture");
                 enabled = false;
+                return;
             }
 
             Init();
 
-            CustomUpdate(_refreshTimeoutSeconds, destroyCancellationToken).Forget();
+            UpdateAsync(_refreshTimeoutSeconds, destroyCancellationToken).Forget();
         }
 
         void Init()
@@ -43,10 +40,10 @@ namespace WLEDControl
             Application.targetFrameRate = targetFrameAndRefreshRate.x;
             _refreshTimeoutSeconds = (float)targetFrameAndRefreshRate.y / targetFrameAndRefreshRate.x;
 
-            _wledTextureData = new NativeArray<Color32>(wledTextureSize.x * wledTextureSize.y, Allocator.Persistent);
+            wledTextureData = new NativeArray<Color32>(wledTextureSize.x * wledTextureSize.y, Allocator.Persistent);
         }
 
-        async UniTaskVoid CustomUpdate(float timeout, CancellationToken ctk)
+        async UniTaskVoid UpdateAsync(float timeout, CancellationToken ctk)
         {
             while (true)
             {
@@ -60,65 +57,17 @@ namespace WLEDControl
         async UniTask Send()
         {
             if (myCamera == null) return;
-            if (!_wledTextureData.IsCreated) Init();
+            if (!wledTextureData.IsCreated) Init();
 
             // this throws when called multiple times a frame
-            await AsyncGPUReadback.RequestIntoNativeArray(ref _wledTextureData, myCamera.targetTexture);
+            await AsyncGPUReadback.RequestIntoNativeArray(ref wledTextureData, myCamera.targetTexture);
 
-            await SendFrameToWLED(_wledTextureData);
+            await WLEDAdapter.PostFrame(wledTextureData, wledUrl);
         }
 
         void OnDestroy()
         {
-            if (_wledTextureData.IsCreated) _wledTextureData.Dispose();
-        }
-
-        async UniTask SendFrameToWLED(NativeArray<Color32> frameData)
-        {
-            var payload = BuildPayload(frameData);
-            if (payload == null || payload.Length == 0) return;
-
-            using var request = new UnityWebRequest
-            {
-                url = wledUrl,
-                method = "POST"
-            };
-
-            request.uploadHandler = new UploadHandlerRaw(payload);
-            request.downloadHandler = new DownloadHandlerBuffer();
-            request.SetRequestHeader("Content-Type", "application/json");
-
-            await request.SendWebRequest();
-
-            if (request.result != UnityWebRequest.Result.Success)
-                Debug.LogError($"Request failed: {request.error}");
-        }
-
-        byte[] BuildPayload(NativeArray<Color32> frameData)
-        {
-            _stringBuilder.Clear();
-
-            var segmentId = 0;
-            _stringBuilder.AppendFormat("{0}{1}{2}",
-                "{\"seg\":[{\"id\":",
-                segmentId,
-                ",\"i\":[");
-
-            for (int i = 0; i < frameData.Length; i++)
-            {
-                if (i > 0) _stringBuilder.Append(",");
-                var color = frameData[i];
-
-                _stringBuilder.AppendFormat("{0},\"{1:X2}{2:X2}{3:X2}\"",
-                    i,
-                    color.r,
-                    color.g,
-                    color.b);
-            }
-
-            _stringBuilder.Append("]}]}");
-
-            return Encoding.UTF8.GetBytes(_stringBuilder.ToString());
+            if (wledTextureData.IsCreated) wledTextureData.Dispose();
         }
     }
 }
