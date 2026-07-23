@@ -15,20 +15,24 @@ namespace WLEDControl
             var payload = BuildPayload(frameData);
             if (payload == null || payload.Length == 0) return;
 
-            using var request = new UnityWebRequest
-            {
-                url = wledUrl,
-                method = "POST"
-            };
-
-            request.uploadHandler = new UploadHandlerRaw(payload);
-            request.downloadHandler = new DownloadHandlerBuffer();
-            request.SetRequestHeader("Content-Type", "application/json");
-
+            using var request = CreateRequest(wledUrl, RequestMethod.POST, payload);
             await request.SendWebRequest();
 
             if (request.result != UnityWebRequest.Result.Success)
                 Debug.LogError($"Request failed: {request.error}");
+        }
+
+        public static async UniTask<string> GetStatus(string wledUrl)
+        {
+            using var request = CreateRequest(wledUrl);
+            await request.SendWebRequest();
+
+            if (request.result != UnityWebRequest.Result.Success)
+            {
+                Debug.LogError($"Request failed: {request.error}");
+                return string.Empty;
+            }
+            return request.downloadHandler.text;
         }
 
         static byte[] BuildPayload(NativeArray<Color32> frameData)
@@ -53,6 +57,36 @@ namespace WLEDControl
             _stringBuilder.Append("]}]}");
 
             return Encoding.UTF8.GetBytes(_stringBuilder.ToString());
+        }
+
+        static UnityWebRequest CreateRequest(
+            string url,
+            RequestMethod method = RequestMethod.GET,
+            byte[] payload = null,
+            string contentType = "application/json")
+        {
+            var request = new UnityWebRequest
+            {
+                url = url,
+                method = method.ToString(),
+
+                downloadHandler = new DownloadHandlerBuffer(),
+            };
+
+            bool canSendBody = method == RequestMethod.POST && payload != null;
+            if (canSendBody)
+                request.uploadHandler = new UploadHandlerRaw(payload);
+
+            if (!string.IsNullOrEmpty(contentType))
+                request.SetRequestHeader("Content-Type", contentType);
+
+            return request;
+        }
+
+        enum RequestMethod
+        {
+            GET,
+            POST,
         }
     }
 }

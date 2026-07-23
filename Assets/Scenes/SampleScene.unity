@@ -543,11 +543,8 @@ MonoBehaviour:
   myCamera: {fileID: 1130240985}
   targetFrameAndRefreshRate:
     x: 60
-    y: 3
-  wledTextureSize:
-    x: 16
-    y: 16
-  wledUrl: <WLED IP HERE>/json/
+    y: 4
+  wledUrl: http://192.168.1.199/json/
 --- !u!1 &1031722971
 GameObject:
   m_ObjectHideFlags: 0
@@ -833,7 +830,7 @@ Camera:
     serializedVersion: 2
     m_Bits: 4294967295
   m_RenderingPath: -1
-  m_TargetTexture: {fileID: 8400000, guid: 53df8adeed7e98a4ea9b5b233bfada3f, type: 2}
+  m_TargetTexture: {fileID: 0}
   m_TargetDisplay: 0
   m_TargetEye: 3
   m_HDR: 1
