@@ -544,7 +544,9 @@ MonoBehaviour:
   targetFrameAndRefreshRate:
     x: 60
     y: 4
-  wledUrl: http://192.168.1.199/json/
+  wledHost: 192.168.1.186
+  transport: 2
+  logStats: 1
 --- !u!1 &1031722971
 GameObject:
   m_ObjectHideFlags: 0

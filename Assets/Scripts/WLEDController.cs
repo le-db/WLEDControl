@@ -11,6 +11,7 @@ using UnityEditor;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
+using Stopwatch = System.Diagnostics.Stopwatch;
 
 namespace WLEDControl
 {
@@ -23,7 +24,19 @@ namespace WLEDControl
         int2 targetFrameAndRefreshRate = new(60, 6);
         float _refreshTimeoutSeconds;
 
-        [SerializeField] string wledUrl = "<WLED IP HERE>/json/";
+        [SerializeField, Tooltip("IP or hostname of the WLED device")]
+        string wledHost = "<WLED IP HERE>";
+
+        [SerializeField, Tooltip("How frames are sent to WLED. Chosen once on start.")]
+        TransportType transport = TransportType.UdpDdp;
+
+        [SerializeField, Tooltip("Log send timings and throughput once per second")]
+        bool logStats = true;
+
+        ILedTransport _transport;
+        TransportStats _stats;
+
+        string WledJsonUrl => $"http://{wledHost}/json/";
 
         NativeArray<Color32> wledTextureData;
         string wledTextureAssetPath = "Assets/Scripts/CameraTarget.renderTexture";
@@ -70,12 +83,26 @@ namespace WLEDControl
 
             wledTextureData = new NativeArray<Color32>(textureSize.x * textureSize.y, Allocator.Persistent);
 
+            _transport = CreateTransport();
+            _stats = logStats ? new TransportStats(_transport.Name) : null;
+
             Debug.Log($"Controller initialized in {(startTime - DateTime.UtcNow).TotalMilliseconds}ms");
+        }
+
+        ILedTransport CreateTransport()
+        {
+            return transport switch
+            {
+                TransportType.HttpJson => new HttpJsonTransport(WledJsonUrl),
+                TransportType.UdpDnrgb => new DnrgbTransport(wledHost),
+                TransportType.UdpDdp => new DdpTransport(wledHost),
+                _ => throw new ArgumentOutOfRangeException(nameof(transport), transport, null),
+            };
         }
 
         async UniTask<int2> GetDimensions()
         {
-            var statusJson = await WLEDAdapter.GetStatus(wledUrl);
+            var statusJson = await WLEDAdapter.GetStatus(WledJsonUrl);
 
             var statusDic = JsonConvert.DeserializeObject<Dictionary<string, object>>(statusJson);
             var stateDic = JsonConvert.DeserializeObject<Dictionary<string, object>>(statusDic["state"].ToString());
@@ -105,10 +132,8 @@ namespace WLEDControl
             while (true)
             {
                 await UniTask.NextFrame(ctk);
-                // TODO: UDP live mode
-                // https://github.com/wled/WLED/wiki/UDP-Realtime-Control
-                // https://learn.microsoft.com/de-de/dotnet/api/system.net.sockets.udpclient.send?view=net-10.0
-                await Send();
+                try { await Send(); }
+                catch (Exception e) { Debug.LogWarning($"Skipping frame: {e}"); }
                 await UniTask.WaitForSeconds(_refreshTimeoutSeconds, cancellationToken: ctk);
             }
         }
@@ -119,14 +144,28 @@ namespace WLEDControl
             if (myCamera == null) return;
             if (!wledTextureData.IsCreated) await Init();
 
+            var readbackStart = Stopwatch.GetTimestamp();
             // this throws when called multiple times a frame
             await AsyncGPUReadback.RequestIntoNativeArray(ref wledTextureData, myCamera.targetTexture);
+            var sendStart = Stopwatch.GetTimestamp();
 
-            await WLEDAdapter.PostFrame(wledTextureData, wledUrl);
+            var sendInfo = await _transport.SendFrame(wledTextureData);
+            var sendEnd = Stopwatch.GetTimestamp();
+
+            _stats?.Record(
+                readbackMs: ElapsedMs(readbackStart, sendStart),
+                sendMs: ElapsedMs(sendStart, sendEnd),
+                sendInfo);
+        }
+
+        static double ElapsedMs(long startTimestamp, long endTimestamp)
+        {
+            return (endTimestamp - startTimestamp) * 1000.0 / Stopwatch.Frequency;
         }
 
         void OnDestroy()
         {
+            _transport?.Dispose();
             if (wledTextureData.IsCreated) wledTextureData.Dispose();
         }
     }
