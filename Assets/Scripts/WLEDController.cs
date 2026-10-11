@@ -89,16 +89,13 @@ namespace WLEDControl
             Debug.Log($"Controller initialized in {(startTime - DateTime.UtcNow).TotalMilliseconds}ms");
         }
 
-        ILedTransport CreateTransport()
+        ILedTransport CreateTransport() => transport switch
         {
-            return transport switch
-            {
-                TransportType.HttpJson => new HttpJsonTransport(WledJsonUrl),
-                TransportType.UdpDnrgb => new DnrgbTransport(wledHost),
-                TransportType.UdpDdp => new DdpTransport(wledHost),
-                _ => throw new ArgumentOutOfRangeException(nameof(transport), transport, null),
-            };
-        }
+            TransportType.HttpJson => new HttpJsonTransport(WledJsonUrl),
+            TransportType.UdpDnrgb => new DnrgbTransport(wledHost),
+            TransportType.UdpDdp => new DdpTransport(wledHost),
+            _ => throw new ArgumentOutOfRangeException(nameof(transport), transport, null),
+        };
 
         async UniTask<int2> GetDimensions()
         {
