@@ -7,8 +7,7 @@ using UnityEngine;
 namespace WLEDControl
 {
     /// <summary>
-    /// Sends frames through the WLED JSON API, as segment 0 individual LED control.
-    /// WLED recommends at most 256 colors per call and no parallel calls, so a frame is split into sequential requests.
+    /// TCP with WLED JSON API
     /// </summary>
     public class HttpJsonTransport : ILedTransport
     {

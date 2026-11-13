@@ -4,7 +4,7 @@ using Debug = UnityEngine.Debug;
 namespace WLEDControl
 {
     /// <summary>
-    /// Collects per-frame timings and logs one summary line per second, for comparing transports.
+    /// per-frame timings and logs for comparing transports
     /// </summary>
     public class TransportStats
     {

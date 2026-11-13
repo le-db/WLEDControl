@@ -5,8 +5,6 @@ using UnityEngine;
 namespace WLEDControl
 {
     /// <summary>
-    /// Distributed Display Protocol: a 10 byte header with a byte offset into the pixel data.
-    /// Only the last packet of a frame carries the push flag, so WLED shows the frame once complete.
     /// http://www.3waylabs.com/ddp/
     /// </summary>
     public class DdpTransport : UdpTransportBase
@@ -22,7 +20,7 @@ namespace WLEDControl
         const int MaxSequence = 15;
 
         readonly byte[] _buffer = new byte[HeaderSize + MaxLedsPerPacket * BytesPerLed];
-        // 1-15, 0 means "unused" in the protocol
+        // 1-15, 0 means "unused"
         int _sequence;
 
         public override string Name => "UDP DDP";

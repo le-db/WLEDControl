@@ -24,13 +24,13 @@ namespace WLEDControl
         int2 targetFrameAndRefreshRate = new(60, 6);
         float _refreshTimeoutSeconds;
 
-        [SerializeField, Tooltip("IP or hostname of the WLED device")]
+        [SerializeField, Tooltip("The WLED host")]
         string wledHost = "<WLED IP HERE>";
 
-        [SerializeField, Tooltip("How frames are sent to WLED. Chosen once on start.")]
+        [SerializeField, Tooltip("Protocol to send to WLED with.")]
         TransportType transport = TransportType.UdpDdp;
 
-        [SerializeField, Tooltip("Log send timings and throughput once per second")]
+        [SerializeField, Tooltip("Whether to log send timings once per second")]
         bool logStats = true;
 
         ILedTransport _transport;

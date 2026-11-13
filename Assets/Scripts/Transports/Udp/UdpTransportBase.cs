@@ -5,9 +5,6 @@ using UnityEngine;
 
 namespace WLEDControl
 {
-    /// <summary>
-    /// Owns the UDP socket. Frames are sent synchronously.
-    /// </summary>
     public abstract class UdpTransportBase : ILedTransport
     {
         protected const int BytesPerLed = 3;

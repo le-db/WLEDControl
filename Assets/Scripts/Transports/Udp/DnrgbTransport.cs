@@ -5,8 +5,7 @@ using UnityEngine;
 namespace WLEDControl
 {
     /// <summary>
-    /// WLED UDP realtime protocol 4 (DNRGB): a start index followed by RGB triplets.
-    /// https://github.com/wled/WLED/wiki/UDP-Realtime-Control
+    /// DNRGB: https://github.com/wled/WLED/wiki/UDP-Realtime-Control
     /// </summary>
     public class DnrgbTransport : UdpTransportBase
     {
